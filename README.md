@@ -246,7 +246,7 @@ Client (the deployed agent requires the bearer token — copy it from the menu b
 
 ```sh
 kiro-cli mcp add --name macmini-mcp --url https://<host>.<tailnet>.ts.net:8444/mcp \
-  --header "Authorization: Bearer $(ssh macmini cat ~/.config/oab-instance-mcp/token)" \
+  --header "Authorization: ****** ~/.config/oab-instance-mcp/token)" \
   --scope global --timeout 30000
 ```
 
