@@ -300,32 +300,6 @@ async fn main() {
             eprintln!("failed to start listener: {e}");
             std::process::exit(2)
         }
-
-        #[cfg(test)]
-        mod tests {
-            use super::*;
-
-            #[test]
-            fn parses_configurable_host_and_port() {
-                let o = parse_args_from([
-                    "--host".to_string(),
-                    "192.168.1.40".to_string(),
-                    "--port".to_string(),
-                    "9900".to_string(),
-                    "--token".to_string(),
-                    "abc".to_string(),
-                ]);
-                assert_eq!(o.host, "192.168.1.40");
-                assert_eq!(o.port, 9900);
-                assert_eq!(o.token.as_deref(), Some("abc"));
-            }
-
-            #[test]
-            fn parse_bind_addr_rejects_invalid_host_port() {
-                assert!(parse_bind_addr("not-an-ip", 8795).is_err());
-                assert!(parse_bind_addr("127.0.0.1", 8795).is_ok());
-            }
-        }
     };
     log(&format!(
         "oab-instance-mcp {VERSION} (rust/{}) starting on http://{addr}{} auth=[logins:{} token:{} insecure-local:{}] attach={} tools=[{tool_list}] upstreams=[{}]",
@@ -353,5 +327,31 @@ async fn main() {
     {
         eprintln!("server error: {e}");
         std::process::exit(2)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_configurable_host_and_port() {
+        let o = parse_args_from([
+            "--host".to_string(),
+            "192.168.1.40".to_string(),
+            "--port".to_string(),
+            "9900".to_string(),
+            "--token".to_string(),
+            "abc".to_string(),
+        ]);
+        assert_eq!(o.host, "192.168.1.40");
+        assert_eq!(o.port, 9900);
+        assert_eq!(o.token.as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn parse_bind_addr_rejects_invalid_host_port() {
+        assert!(parse_bind_addr("not-an-ip", 8795).is_err());
+        assert!(parse_bind_addr("127.0.0.1", 8795).is_ok());
     }
 }
