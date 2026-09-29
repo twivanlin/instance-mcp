@@ -81,7 +81,7 @@ Caller config:
 
 ```sh
 claude mcp add --transport http <name> https://<node>.<tailnet>.ts.net:8444/mcp \
-  --header "Authorization: Bearer ~/.config/oab-instance-mcp/token)"
+  --header "Authorization: Bearer $(cat ~/.config/oab-instance-mcp/token)"
 ```
 
 ### Private LAN deployment (no Tailscale, Linux only)
@@ -105,7 +105,7 @@ MCP URL format:
 Bearer-token configuration:
 
 - Token file path: `~/.config/oab-instance-mcp/token` (mode `600`)
-- MCP header: `Authorization: Bearer ~/.config/oab-instance-mcp/token)`
+- MCP header: `Authorization: Bearer $(cat ~/.config/oab-instance-mcp/token)`
 
 Required firewall rule (example):
 
@@ -119,7 +119,7 @@ How to test the endpoint:
 curl -i "http://192.168.1.40:8795/healthz"
 curl -i -X POST "http://192.168.1.40:8795/mcp" \
   -H "content-type: application/json" \
-  -H "authorization: Bearer ~/.config/oab-instance-mcp/token)" \
+  -H "Authorization: Bearer $(cat ~/.config/oab-instance-mcp/token)" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
 ```
 
