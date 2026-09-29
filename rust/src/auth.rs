@@ -2,7 +2,7 @@
 //!
 //! Evaluated per request from headers `tailscale serve` injects (`Tailscale-User-Login`)
 //! plus an optional shared bearer token. Both checks that are configured must pass. With
-//! neither configured the server refuses to start — see `validate()` — because a loopback
+//! neither configured the server refuses to start — see `validate_for_bind()` — because a loopback
 //! listener behind `tailscale serve` is reachable by every node on the tailnet.
 
 use std::collections::{HashMap, HashSet};
@@ -36,7 +36,7 @@ impl AuthPolicy {
         }
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate_for_bind(&self, bind_is_loopback: bool) -> Result<(), String> {
         if self.allowed_logins.is_empty()
             && self.bearer_token.is_none()
             && !self.allow_local_unauthenticated
@@ -44,6 +44,12 @@ impl AuthPolicy {
             return Err(
                 "refusing to start with no auth: set --allow-login and/or --token \
                         (or --insecure-local for loopback-only debugging)"
+                    .into(),
+            );
+        }
+        if !bind_is_loopback && self.bearer_token.is_none() {
+            return Err(
+                "refusing non-loopback bind without bearer token: set --token or --token-file"
                     .into(),
             );
         }
@@ -137,8 +143,18 @@ mod tests {
 
     #[test]
     fn refuses_to_start_without_auth() {
-        assert!(AuthPolicy::default().validate().is_err());
-        assert!(AuthPolicy::new([], None, true).validate().is_ok());
+        assert!(AuthPolicy::default().validate_for_bind(true).is_err());
+        assert!(AuthPolicy::new([], None, true).validate_for_bind(true).is_ok());
+    }
+
+    #[test]
+    fn non_loopback_bind_requires_token() {
+        assert!(AuthPolicy::new(["me@example.com".into()], None, false)
+            .validate_for_bind(false)
+            .is_err());
+        assert!(AuthPolicy::new([], Some("t".into()), false)
+            .validate_for_bind(false)
+            .is_ok());
     }
 
     #[test]

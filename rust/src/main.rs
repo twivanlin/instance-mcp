@@ -54,6 +54,12 @@ struct Options {
     upstreams: Vec<(String, String)>,
 }
 
+fn parse_bind_addr(host: &str, port: u16) -> Result<SocketAddr, String> {
+    format!("{host}:{port}")
+        .parse()
+        .map_err(|e| format!("bad --host/--port: {e}"))
+}
+
 fn usage() -> ! {
     println!(
         "oab-instance-mcp {VERSION} (Rust, {os}) — MCP server exposing this machine (exec / screenshot / mouse / key / sys_info)
@@ -68,6 +74,8 @@ Auth (at least one required unless --insecure-local):
   --token-file    Read the token from a file (trailing newline stripped).
   --insecure-local  Allow unauthenticated requests that arrive on loopback *without*
                     Tailscale headers. For local debugging only.
+
+When binding beyond localhost (`--host` not loopback), a bearer token is mandatory.
 
   --no-attach     Disable the reverse-attach plane (POST/GET /attach, DELETE /attach/{{id}}):
                   the human-credentialed endpoint through which Connect / Remote lends this
@@ -91,6 +99,10 @@ behind `tailscale serve` (see rust/deploy/).",
 }
 
 fn parse_args() -> Options {
+    parse_args_from(std::env::args().skip(1))
+}
+
+fn parse_args_from(args: impl IntoIterator<Item = String>) -> Options {
     let mut o = Options {
         host: "127.0.0.1".into(),
         port: 8795,
@@ -105,7 +117,7 @@ fn parse_args() -> Options {
         desktop: true,
         upstreams: vec![],
     };
-    let mut args = std::env::args().skip(1);
+    let mut args = args.into_iter();
     let next = |flag: &str, args: &mut dyn Iterator<Item = String>| {
         args.next().unwrap_or_else(|| {
             eprintln!("missing value for {flag}");
@@ -213,6 +225,13 @@ fn instructions(desktop: bool, browser: bool) -> String {
 #[tokio::main]
 async fn main() {
     let opts = parse_args();
+    let addr = match parse_bind_addr(&opts.host, opts.port) {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(64)
+        }
+    };
     // One TLS crypto provider for every rustls user (wss:// dial, https:// mint).
     let _ = tokio_rustls::rustls::crypto::ring::default_provider().install_default();
     let _ = QUIET.set(opts.quiet);
@@ -223,7 +242,7 @@ async fn main() {
         opts.token.clone(),
         opts.insecure_local,
     );
-    if let Err(e) = auth.validate() {
+    if let Err(e) = auth.validate_for_bind(addr.ip().is_loopback()) {
         eprintln!("{e}");
         std::process::exit(64)
     }
@@ -275,18 +294,37 @@ async fn main() {
         .then(|| attach::AttachManager::new(server.clone(), None));
     let endpoint = http::Endpoint::new(opts.path.clone(), server, auth, attach);
 
-    let addr: SocketAddr = match format!("{}:{}", opts.host, opts.port).parse() {
-        Ok(a) => a,
-        Err(e) => {
-            eprintln!("bad --host/--port: {e}");
-            std::process::exit(64)
-        }
-    };
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
         Err(e) => {
             eprintln!("failed to start listener: {e}");
             std::process::exit(2)
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+
+            #[test]
+            fn parses_configurable_host_and_port() {
+                let o = parse_args_from([
+                    "--host".to_string(),
+                    "192.168.1.40".to_string(),
+                    "--port".to_string(),
+                    "9900".to_string(),
+                    "--token".to_string(),
+                    "abc".to_string(),
+                ]);
+                assert_eq!(o.host, "192.168.1.40");
+                assert_eq!(o.port, 9900);
+                assert_eq!(o.token.as_deref(), Some("abc"));
+            }
+
+            #[test]
+            fn parse_bind_addr_rejects_invalid_host_port() {
+                assert!(parse_bind_addr("not-an-ip", 8795).is_err());
+                assert!(parse_bind_addr("127.0.0.1", 8795).is_ok());
+            }
         }
     };
     log(&format!(

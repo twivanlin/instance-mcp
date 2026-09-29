@@ -84,4 +84,51 @@ claude mcp add --transport http <name> https://<node>.<tailnet>.ts.net:8444/mcp 
   --header "Authorization: Bearer $(cat ~/.config/oab-instance-mcp/token)"
 ```
 
+### Private LAN deployment (no Tailscale, Linux only)
+
+Use LAN mode to bind directly to a private interface/IP:
+
+```sh
+rust/deploy/install.sh --lan --bind-host 192.168.1.40 --bind-port 8795 --no-browser
+```
+
+- The service runs with `--host <LAN_IP> --port <LAN_PORT>`.
+- `--token-file ~/.config/oab-instance-mcp/token` is always passed by the install script.
+- On non-loopback binds, the daemon refuses to start unless a bearer token is configured.
+- Do not hardcode token values or LAN IPs in source code.
+
+MCP URL format:
+
+- `http://<LAN_IP>:<LAN_PORT>/mcp`
+
+****** configuration:
+
+- Token file path: `~/.config/oab-instance-mcp/token` (mode `600`)
+- MCP header: `Authorization: ******
+
+Required firewall rule (example):
+
+```sh
+sudo ufw allow from 192.168.1.0/24 to any port 8795 proto tcp
+```
+
+How to test the endpoint:
+
+```sh
+curl -i "http://192.168.1.40:8795/healthz"
+curl -i -X POST "http://192.168.1.40:8795/mcp" \
+  -H "content-type: application/json" \
+  -H "authorization: ****** ~/.config/oab-instance-mcp/token)" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+```
+
+How to disable LAN access:
+
+- Rebind to loopback only: `rust/deploy/install.sh --bind-host 127.0.0.1 --bind-port 8795`
+- Or remove firewall allow rule (example): `sudo ufw delete allow from 192.168.1.0/24 to any port 8795 proto tcp`
+
+Network behavior: normal MCP calls are request/response only. The daemon does not initiate a
+connection back to the caller unless reverse attach (`/attach`) or an upstream MCP (`--upstream`)
+is explicitly configured.
+
 Logs: `journalctl --user -u oab-instance-mcp -f`.
