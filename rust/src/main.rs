@@ -354,4 +354,10 @@ mod tests {
         assert!(parse_bind_addr("not-an-ip", 8795).is_err());
         assert!(parse_bind_addr("127.0.0.1", 8795).is_ok());
     }
+
+    #[test]
+    fn parses_no_attach_flag() {
+        let o = parse_args_from(["--token".to_string(), "abc".to_string(), "--no-attach".to_string()]);
+        assert!(!o.attach);
+    }
 }

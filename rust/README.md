@@ -81,7 +81,7 @@ Caller config:
 
 ```sh
 claude mcp add --transport http <name> https://<node>.<tailnet>.ts.net:8444/mcp \
-  --header "Authorization: Bearer $(cat ~/.config/oab-instance-mcp/token)"
+  --header "Authorization: Bearer ~/.config/oab-instance-mcp/token)"
 ```
 
 ### Private LAN deployment (no Tailscale, Linux only)
@@ -94,6 +94,7 @@ rust/deploy/install.sh --lan --bind-host 192.168.1.40 --bind-port 8795 --no-brow
 
 - The service runs with `--host <LAN_IP> --port <LAN_PORT>`.
 - `--token-file ~/.config/oab-instance-mcp/token` is always passed by the install script.
+- In `--lan` mode, the install script also sets `--no-attach` (one-way client → Linux MCP only).
 - On non-loopback binds, the daemon refuses to start unless a bearer token is configured.
 - Do not hardcode token values or LAN IPs in source code.
 
@@ -101,10 +102,10 @@ MCP URL format:
 
 - `http://<LAN_IP>:<LAN_PORT>/mcp`
 
-****** configuration:
+Bearer-token configuration:
 
 - Token file path: `~/.config/oab-instance-mcp/token` (mode `600`)
-- MCP header: `Authorization: ******
+- MCP header: `Authorization: Bearer ~/.config/oab-instance-mcp/token)`
 
 Required firewall rule (example):
 
@@ -118,8 +119,17 @@ How to test the endpoint:
 curl -i "http://192.168.1.40:8795/healthz"
 curl -i -X POST "http://192.168.1.40:8795/mcp" \
   -H "content-type: application/json" \
-  -H "authorization: ****** ~/.config/oab-instance-mcp/token)" \
+  -H "authorization: Bearer ~/.config/oab-instance-mcp/token)" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+```
+
+Verify LAN service args (bearer token + no reverse attach):
+
+```sh
+systemctl --user cat oab-instance-mcp.service | grep ExecStart
+# Must include both:
+#   --token-file %h/.config/oab-instance-mcp/token
+#   --no-attach
 ```
 
 How to disable LAN access:

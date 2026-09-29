@@ -9,6 +9,7 @@
 #
 # Re-runnable: keeps an existing token, rebuilds and restarts the service.
 # --http-port 0 skips the tailnet-only plain-HTTP entry.
+# --lan configures one-way LAN access and sets --no-attach in the service args.
 # With Node.js available it also installs the Playwright MCP (headed browser, loopback only)
 # and re-serves its browser_* tools through the daemon; --no-browser skips that.
 set -euo pipefail
@@ -73,6 +74,9 @@ chmod 600 "$token_file"
 unit_dir="$HOME/.config/systemd/user"
 install -d "$unit_dir"
 extra_args=""
+if [[ "$lan_mode" == yes ]]; then
+  extra_args="--no-attach"
+fi
 if [[ "$browser" == auto ]] && command -v node >/dev/null && command -v npm >/dev/null; then
   echo "==> Playwright MCP (browser_* tools) on 127.0.0.1:8794"
   data="${XDG_DATA_HOME:-$HOME/.local/share}/oab-instance-mcp"
@@ -89,7 +93,7 @@ if [[ "$browser" == auto ]] && command -v node >/dev/null && command -v npm >/de
   systemctl --user daemon-reload
   systemctl --user enable oab-pw-mcp.service >/dev/null
   systemctl --user restart oab-pw-mcp.service
-  extra_args="--upstream browser=http://127.0.0.1:8794/mcp"
+  extra_args="${extra_args:+$extra_args }--upstream browser=http://127.0.0.1:8794/mcp"
 elif [[ "$browser" == auto ]]; then
   echo "==> no Node.js: skipping the browser (install node and re-run for browser_* tools)"
 fi
